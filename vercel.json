@@ -1,0 +1,12 @@
+{
+    "version": 2,
+    "builds": [
+        { "src": "api/**/*.js", "use": "@vercel/node" }
+    ],
+    "routes": [
+        { "src": "/api/posthog-webhook", "dest": "/api/posthog-webhook.js" },
+        { "src": "/api/sse-notifications", "dest": "/api/sse-notifications.js" },
+        { "src": "/admin", "dest": "/admin.html" },
+        { "src": "/(.*)", "dest": "/index.html" }
+    ]
+}

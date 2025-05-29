@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostNotifs</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        #status { margin-bottom: 15px; padding: 10px; background-color: #e0e0e0; border-radius: 4px; }
+        ul { list-style-type: none; padding: 0; }
+        li { background-color: #f9f9f9; border: 1px solid #ddd; margin-bottom: 5px; padding: 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Listening for Site Visits...</h1>
+    <div id="status">Requesting notification permission...</div>
+    <p>Keep this page open in a browser tab to receive desktop notifications.</p>
+    <ul id="visit-log"></ul>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const visitLog = document.getElementById('visit-log');
+
+        function showNotification(data) {
+            const title = '🎉 New Site Visit!';
+            let body = `Someone visited your site.`;
+            if (data.url) body += `\nPage: ${data.url}`;
+            if (data.city) body += `\nFrom: ${data.city}`;
+            if (data.country) body += `, ${data.country}`;
+            if (data.ip) body += ` (IP: ${data.ip})`;
+
+
+            const notification = new Notification(title, {
+                body: body,
+                icon: '/favicon.ico' // Optional: Add a favicon.ico to your project root
+            });
+
+            // Log it to the page
+            const listItem = document.createElement('li');
+            listItem.textContent = `${new Date().toLocaleTimeString()}: ${body.replace('\n', ' - ')}`;
+            visitLog.prepend(listItem); // Add new visits to the top
+            if (visitLog.children.length > 20) { // Keep log size manageable
+                visitLog.removeChild(visitLog.lastChild);
+            }
+        }
+
+        function setupSSE() {
+            statusDiv.textContent = 'Connecting to event stream...';
+            const evtSource = new EventSource("/api/sse-notifications");
+
+            evtSource.onopen = function() {
+                statusDiv.textContent = '✅ Connected. Listening for visits...';
+                console.log("SSE Connection opened.");
+            };
+
+            evtSource.onmessage = function(event) {
+                console.log("Message from server: ", event.data);
+                try {
+                    const visitData = JSON.parse(event.data);
+                    showNotification(visitData);
+                } catch (e) {
+                    console.error("Failed to parse event data:", e);
+                    statusDiv.textContent = '⚠️ Error parsing event data.';
+                }
+            };
+
+            evtSource.onerror = function(err) {
+                statusDiv.textContent = '❌ SSE Connection error. Will attempt to reconnect automatically. Check console.';
+                console.error("EventSource failed:", err);
+                // EventSource will automatically try to reconnect
+            };
+        }
+
+        if (!("Notification" in window)) {
+            statusDiv.textContent = "This browser does not support desktop notification";
+            alert("This browser does not support desktop notification");
+        } else if (Notification.permission === "granted") {
+            statusDiv.textContent = "Notification permission already granted.";
+            setupSSE();
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(function (permission) {
+                if (permission === "granted") {
+                    statusDiv.textContent = "Notification permission granted.";
+                    setupSSE();
+                } else {
+                    statusDiv.textContent = "Notification permission denied. You won't receive desktop alerts.";
+                }
+            });
+        } else {
+             statusDiv.textContent = "Notification permission denied. You won't receive desktop alerts.";
+        }
+    </script>
+</body>
+</html>
